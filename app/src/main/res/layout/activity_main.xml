@@ -149,6 +149,24 @@
                     android:layout_height="wrap_content"
                     android:text="Window Obscured: Waiting for touch..."
                     android:textSize="14sp"
+                    android:textColor="#FFFFFFFF"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:id="@+id/accessibilityEventStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Accessibility Gesture: Waiting for touch..."
+                    android:textSize="14sp"
+                    android:textColor="#FFFFFFFF"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:id="@+id/sourceAuthenticityStatus"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Source Authenticity: Waiting for touch..."
+                    android:textSize="14sp"
                     android:textColor="#FFFFFFFF" />
 
             </LinearLayout>

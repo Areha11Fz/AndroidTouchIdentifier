@@ -24,6 +24,8 @@ class MainActivity : AppCompatActivity() {
     private lateinit var sourceStatus: TextView
     private lateinit var toolTypeStatus: TextView
     private lateinit var obscuredStatus: TextView
+    private lateinit var accessibilityEventStatus: TextView
+    private lateinit var sourceAuthenticityStatus: TextView
     private lateinit var verdictText: TextView
     private lateinit var touchArea: MaterialCardView
 
@@ -39,6 +41,8 @@ class MainActivity : AppCompatActivity() {
         sourceStatus = findViewById(R.id.sourceStatus)
         toolTypeStatus = findViewById(R.id.toolTypeStatus)
         obscuredStatus = findViewById(R.id.obscuredStatus)
+        accessibilityEventStatus = findViewById(R.id.accessibilityEventStatus)
+        sourceAuthenticityStatus = findViewById(R.id.sourceAuthenticityStatus)
         verdictText = findViewById(R.id.verdictText)
         touchArea = findViewById(R.id.touchArea)
 
@@ -122,6 +126,17 @@ class MainActivity : AppCompatActivity() {
         val toolType = event.getToolType(0)
         val isObscured = event.flags and MotionEvent.FLAG_WINDOW_IS_OBSCURED != 0
 
+        val isAccessibilityEvent = event.flags and 0x400 != 0
+
+        val isFromTouchscreen = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            event.isFromSource(InputDevice.SOURCE_TOUCHSCREEN)
+        } else {
+            source and InputDevice.SOURCE_TOUCHSCREEN == InputDevice.SOURCE_TOUCHSCREEN
+        }
+        val hasRealDevice = device != null && deviceId != -1 && deviceId != 0
+        val sourceAuthentic = isFromTouchscreen && hasRealDevice
+        val deviceDescriptor = device?.descriptor ?: "none"
+
         deviceIdStatus.text = "Device ID: $deviceId"
         deviceIdStatus.setTextColor(getColor(
             if (deviceId == 0 || deviceId == -1) R.color.status_red else R.color.status_green
@@ -147,7 +162,26 @@ class MainActivity : AppCompatActivity() {
             if (isObscured) R.color.status_yellow else R.color.status_green
         ))
 
-        generateVerdict(deviceId, isVirtual, source, toolType, isObscured)
+        accessibilityEventStatus.text = "Accessibility Gesture (dispatchGesture): $isAccessibilityEvent"
+        accessibilityEventStatus.setTextColor(getColor(
+            if (isAccessibilityEvent) R.color.status_red else R.color.status_green
+        ))
+
+        val sourceDetail = buildString {
+            append("Source: ${getSourceName(source)}")
+            append(" | Device: ${device?.name ?: "null"}")
+            append(" | ID: $deviceId")
+            append(" | Descriptor: $deviceDescriptor")
+            if (!isFromTouchscreen) append(" | NOT touchscreen source")
+            if (!hasRealDevice) append(" | NO real device")
+            if (isVirtual) append(" | VIRTUAL device")
+        }
+        sourceAuthenticityStatus.text = "Source Authenticity: $sourceDetail"
+        sourceAuthenticityStatus.setTextColor(getColor(
+            if (sourceAuthentic) R.color.status_green else R.color.status_red
+        ))
+
+        generateVerdict(deviceId, isVirtual, source, toolType, isObscured, isAccessibilityEvent, sourceAuthentic)
     }
 
     private fun generateVerdict(
@@ -155,15 +189,23 @@ class MainActivity : AppCompatActivity() {
         isVirtual: Boolean,
         source: Int,
         toolType: Int,
-        isObscured: Boolean
+        isObscured: Boolean,
+        isAccessibilityEvent: Boolean,
+        sourceAuthentic: Boolean
     ) {
         val risks = mutableListOf<String>()
 
+        if (isAccessibilityEvent) {
+            risks.add("dispatchGesture() detected (accessibility auto-clicker)")
+        }
         if (deviceId == 0 || deviceId == -1) {
             risks.add("Device ID is 0/-1 (software injection)")
         }
         if (isVirtual) {
             risks.add("Virtual input device detected")
+        }
+        if (!sourceAuthentic) {
+            risks.add("Source/device mismatch (synthetic event)")
         }
         if (source == InputDevice.SOURCE_MOUSE) {
             risks.add("Mouse source (possible PC tool)")
@@ -193,13 +235,23 @@ class MainActivity : AppCompatActivity() {
 
     private fun getSourceName(source: Int): String {
         return when (source) {
+            InputDevice.SOURCE_UNKNOWN -> "UNKNOWN (0)"
+            InputDevice.SOURCE_KEYBOARD -> "KEYBOARD"
+            InputDevice.SOURCE_DPAD -> "DPAD"
+            InputDevice.SOURCE_GAMEPAD -> "GAMEPAD"
             InputDevice.SOURCE_TOUCHSCREEN -> "TOUCHSCREEN"
             InputDevice.SOURCE_MOUSE -> "MOUSE"
             InputDevice.SOURCE_STYLUS -> "STYLUS"
-            InputDevice.SOURCE_KEYBOARD -> "KEYBOARD"
-            InputDevice.SOURCE_DPAD -> "DPAD"
+            InputDevice.SOURCE_BLUETOOTH_STYLUS -> "BT_STYLUS"
+            InputDevice.SOURCE_TRACKBALL -> "TRACKBALL"
+            InputDevice.SOURCE_MOUSE_RELATIVE -> "MOUSE_RELATIVE"
+            InputDevice.SOURCE_TOUCHPAD -> "TOUCHPAD"
+            InputDevice.SOURCE_TOUCH_NAVIGATION -> "TOUCH_NAV"
+            InputDevice.SOURCE_ROTARY_ENCODER -> "ROTARY_ENCODER"
             InputDevice.SOURCE_JOYSTICK -> "JOYSTICK"
-            else -> "UNKNOWN ($source)"
+            InputDevice.SOURCE_HDMI -> "HDMI"
+            InputDevice.SOURCE_SENSOR -> "SENSOR"
+            else -> "COMPOSITE/OTHER (0x${Integer.toHexString(source)})"
         }
     }
 
